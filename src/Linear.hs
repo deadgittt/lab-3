@@ -36,13 +36,15 @@ linearStream step (p0 : rest) =
                 [Timed idx prev | lastEmittedXs + eps < fst prev]
             (p : ps) ->
                 let idx' = idx + 1
+                    prevOut = [Timed idx prev | lastEmittedXs + eps < fst prev]
                     (xs, nextX') = spanToLimit nextX step (fst p)
                     outs = map (\x -> Timed idx' (x, interpolate prev p x)) xs
+                    emitted = prevOut ++ outs
                     newLast =
-                        case outs of
+                        case emitted of
                             [] -> lastEmittedXs
-                            _ -> fst (timedValue (last outs))
-                 in outs ++ go idx' p nextX' newLast ps
+                            _ -> fst (timedValue (last emitted))
+                 in emitted ++ go idx' p nextX' newLast ps
 
 -- Сгенерировать последовательность x до порога limit, вернуть следующее стартовое значение
 spanToLimit :: Double -> Double -> Double -> ([Double], Double)

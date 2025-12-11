@@ -13,7 +13,7 @@ import Data.Maybe (mapMaybe)
 import Linear (Point, Timed (..), linearStream)
 import System.Environment (getArgs)
 import System.Exit (exitFailure)
-import System.IO (hPutStrLn, stderr)
+import System.IO (hPutStrLn, isEOF, stderr)
 import Text.Read (readMaybe)
 
 data Algorithm = Linear | Cubic deriving (Eq, Show)
@@ -82,17 +82,17 @@ usage =
 
 -- Разбор входных данных из строк
 parsePoints :: String -> [Point]
-parsePoints =
-    mapMaybe parseLine . lines
-  where
-    parseLine raw =
-        case words (map normalize raw) of
-            [sx, sy] -> do
-                x <- readMaybe sx
-                y <- readMaybe sy
-                pure (x, y)
-            _ -> Nothing
+parsePoints = mapMaybe parsePointLine . lines
 
+parsePointLine :: String -> Maybe Point
+parsePointLine raw =
+    case words (map normalize raw) of
+        [sx, sy] -> do
+            x <- readMaybe sx
+            y <- readMaybe sy
+            pure (x, y)
+        _ -> Nothing
+  where
     normalize ch
         | ch == ';' || ch == ',' = ' '
         | otherwise = ch
@@ -135,9 +135,20 @@ main = do
     args <- getArgs
     case parseConfig args of
         Left msg -> hPutStrLn stderr msg >> hPutStrLn stderr usage >> exitFailure
-        Right cfg -> do
-            raw <- getContents
-            let pts = parsePoints raw
-            if null pts
-                then hPutStrLn stderr "Не удалось распарсить входные данные" >> exitFailure
-                else mapM_ (putStrLn . render) (runInterpolations cfg pts)
+        Right cfg -> loop cfg [] 0
+
+loop :: Config -> [Point] -> Int -> IO ()
+loop cfg pts emittedCount = do
+    eof <- isEOF
+    if eof
+        then pure ()
+        else do
+            line <- getLine
+            case parsePointLine line of
+                Nothing -> loop cfg pts emittedCount
+                Just p ->
+                    let pts' = pts ++ [p]
+                        allOuts = runInterpolations cfg pts'
+                        newOuts = drop emittedCount allOuts
+                        emittedCount' = emittedCount + length newOuts
+                     in mapM_ (putStrLn . render) newOuts >> loop cfg pts' emittedCount'

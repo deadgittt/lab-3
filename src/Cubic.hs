@@ -43,9 +43,15 @@ cubicStream step (p0 : ps) = Timed 1 p0 : go 1 [p0] (fst p0 + step) (fst p0) ps
             (p : rest) ->
                 let idx' = idx + 1
                     acc' = acc ++ [p]
+                    prev = last acc
+                    prevOut = [Timed idx prev | lastEmittedXs + eps < fst prev]
                     (outs, nextX', lastOutX) = emit idx' acc' nextX
-                    newLast = fromMaybe lastEmittedXs lastOutX
-                 in outs ++ go idx' acc' nextX' newLast rest
+                    emitted = prevOut ++ outs
+                    newLast =
+                        case emitted of
+                            [] -> fromMaybe lastEmittedXs lastOutX
+                            _ -> fst (timedValue (last emitted))
+                 in emitted ++ go idx' acc' nextX' newLast rest
 
     finalize idx acc nextX lastEmittedXs =
         let lastX = fst (last acc)
