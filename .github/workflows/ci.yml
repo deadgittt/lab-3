@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Stack
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.stack
+            .stack-work
+          key: ${{ runner.os }}-stack-${{ hashFiles('**/stack.yaml.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-stack-
+
+      - name: Setup Haskell (Stack)
+        uses: haskell/actions/setup@v2
+        with:
+          stack: true
+
+      - name: Cache tools
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/bin
+          key: ${{ runner.os }}-tools-${{ hashFiles('**/stack.yaml.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-tools-
+
+      - name: Show Stack version
+        run: |
+          stack --version
+          stack path
+
+      - name: Install tooling (hlint, fourmolu)
+        run: |
+          stack install hlint fourmolu --local-bin-path $HOME/.local/bin
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: HLint
+        run: hlint src test
+
+      - name: Fourmolu (format check)
+        run: fourmolu -m check src test
+
+      - name: Stack test
+        run: stack test --no-interleaved-output
